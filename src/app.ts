@@ -2,7 +2,8 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import logger = require("./middleware/logger");
-import router from "./routes";
+import { setupSwagger } from "./docs/swagger";
+import authRouter from "./routes/auth.route";
 
 const app = express();
 
@@ -13,6 +14,8 @@ app.use(express.json());
 app.use(logger.logger);
 
 // Routes
-app.use("/api", router);
+app.use("/api/auth", authRouter);
+
+setupSwagger(app)
 
 export default app;

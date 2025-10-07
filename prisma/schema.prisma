@@ -1,0 +1,288 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------
+// USERS
+// --------------------
+model User {
+  id              Int      @id @default(autoincrement())
+  name            String
+  email           String   @unique
+  password        String
+  role            UserRole @default(BUYER) // BUYER, SELLER, ADMIN
+  phone           String?
+  isActive        Boolean  @default(true)
+  isEmailVerified Boolean  @default(false)
+  avatarUrl       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relationships
+  addresses Address[]
+  shops     Shop[] // Only for sellers
+  orders    Order[] // Buyer orders
+  cartItems Cart[]
+  favorites Favorite[]
+  reviews   Rating[]
+}
+
+enum UserRole {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+// --------------------
+// SHOPS (owned by sellers)
+// --------------------
+model Shop {
+  id            Int      @id @default(autoincrement())
+  name          String
+  address       String
+  description   String?
+  contactEmail  String   @unique
+  contactNumber String?
+  owner         User     @relation(fields: [ownerId], references: [id])
+  ownerId       Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  isActive      Boolean  @default(true)
+
+  // Relationships
+  products Product[]
+}
+
+// --------------------
+// PRODUCT CATEGORIES
+// --------------------
+model Category {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  // Relationships
+  products Product[]
+}
+
+// --------------------
+// NUTRIENTS
+// --------------------
+model Nutrient {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique // e.g., Protein, Carbs, Fat, Fiber, Sugar
+  unit        String // e.g., g, mg, kcal
+  description String?
+  createdAt   DateTime @default(now())
+
+  // Relationships
+  productNutrients ProductNutrient[]
+}
+
+// --------------------
+// PRODUCTS
+// --------------------
+model Product {
+  id          Int       @id @default(autoincrement())
+  name        String
+  description String?
+  price       Float
+  quantity    Int
+  sku         String?   @unique
+  shop        Shop      @relation(fields: [shopId], references: [id])
+  shopId      Int
+  category    Category? @relation(fields: [categoryId], references: [id])
+  categoryId  Int?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relationships
+  images           ProductImage[]
+  ingredients      Ingredient[]
+  cartItems        Cart[]
+  orderItems       OrderItem[]
+  favorites        Favorite[]
+  ratings          Rating[]
+  productNutrients ProductNutrient[]
+}
+
+// --------------------
+// PRODUCT NUTRIENTS
+// --------------------
+
+model ProductNutrient {
+  id        Int     @id @default(autoincrement())
+  product   Product @relation(fields: [productId], references: [id])
+  productId Int
+
+  nutrient   Nutrient @relation(fields: [nutrientId], references: [id])
+  nutrientId Int
+
+  value Float // amount of this nutrient in the product
+}
+
+// --------------------
+// PRODUCT IMAGES
+// --------------------
+model ProductImage {
+  id          Int     @id @default(autoincrement())
+  url         String
+  isThumbnail Boolean @default(false)
+  product     Product @relation(fields: [productId], references: [id])
+  productId   Int
+}
+
+// --------------------
+// PRODUCT INGREDIENTS
+// --------------------
+model Ingredient {
+  id        Int     @id @default(autoincrement())
+  name      String
+  quantity  String? // e.g., "200g", "1 cup"
+  product   Product @relation(fields: [productId], references: [id])
+  productId Int
+}
+
+// --------------------
+// CART (for buyers)
+// --------------------
+model Cart {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  product   Product  @relation(fields: [productId], references: [id])
+  productId Int
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, productId]) // one product only once per user
+}
+
+// --------------------
+// ORDERS
+// --------------------
+model Order {
+  id              Int         @id @default(autoincrement())
+  buyer           User        @relation(fields: [buyerId], references: [id])
+  buyerId         Int
+  totalAmount     Float
+  status          OrderStatus @default(PENDING) // PENDING, PAID, SHIPPED, DELIVERED, CANCELLED
+  payment         Payment?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  shippingAddress Address?    @relation(fields: [addressId], references: [id])
+
+  // Relationships
+  items     OrderItem[]
+  addressId Int?
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+// --------------------
+// ORDER ITEMS (products in an order)
+// --------------------
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  order     Order   @relation(fields: [orderId], references: [id])
+  orderId   Int
+  product   Product @relation(fields: [productId], references: [id])
+  productId Int
+  quantity  Int
+  price     Float // snapshot of product price at order time
+}
+
+// --------------------
+// PAYMENTS
+// --------------------
+model Payment {
+  id        Int           @id @default(autoincrement())
+  order     Order         @relation(fields: [orderId], references: [id])
+  orderId   Int           @unique
+  method    PaymentMethod
+  status    PaymentStatus @default(PENDING)
+  amount    Float
+  paidAt    DateTime?
+  createdAt DateTime      @default(now())
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  DEBIT_CARD
+  UPI
+  WALLET
+  PAYPAL
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// --------------------
+// ADDRESS
+// --------------------
+model Address {
+  id         Int      @id @default(autoincrement())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     Int
+  label      String? // Home, Office, etc.
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String
+  country    String
+  phone      String?
+  createdAt  DateTime @default(now())
+  Order      Order[]
+}
+
+// --------------------
+// RATINGS / REVIEWS
+// --------------------
+model Rating {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  product   Product  @relation(fields: [productId], references: [id])
+  productId Int
+  rating    Int      @default(5) // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+// --------------------
+// FAVORITES / WISHLIST
+// --------------------
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  product   Product  @relation(fields: [productId], references: [id])
+  productId Int
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+}
