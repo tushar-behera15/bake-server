@@ -5,6 +5,8 @@ import logger = require("./middleware/logger");
 import { setupSwagger } from "./docs/swagger";
 import authRouter from "./routes/auth.route";
 import cookieParser from "cookie-parser";
+import productrouter from "./routes/product.route";
+import categoryrouter from "./routes/category.route";
 const app = express();
 
 // Middleware
@@ -20,7 +22,8 @@ app.use(cookieParser());
 
 // Routes
 app.use("/api/auth", authRouter);
-
+app.use("/api/product", productrouter);
+app.use("/api/category", categoryrouter);
 setupSwagger(app)
 
 export default app;
