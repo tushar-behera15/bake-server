@@ -7,6 +7,7 @@ import authRouter from "./routes/auth.route";
 import cookieParser from "cookie-parser";
 import productrouter from "./routes/product.route";
 import categoryrouter from "./routes/category.route";
+import shoprouter from "./routes/shop.route";
 const app = express();
 
 // Middleware
@@ -24,6 +25,7 @@ app.use(cookieParser());
 app.use("/api/auth", authRouter);
 app.use("/api/product", productrouter);
 app.use("/api/category", categoryrouter);
+app.use("/api/shop", shoprouter);
 setupSwagger(app)
 
 export default app;
