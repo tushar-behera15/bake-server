@@ -1,8 +1,19 @@
 import { prisma } from "../utils/database";
 import { Request, Response } from "express";
+import { verifyToken } from "../utils/jwt";
 /**
  * ✅ Get all products
  */
+const getOwnerId = (req: Request): number | null => {
+    try {
+        const token = req.cookies?.token;
+        if (!token) return null;
+        const payload: any = verifyToken(token);
+        return payload.userId;
+    } catch (err) {
+        return null;
+    }
+};
 export const getProducts = async (req: Request, res: Response) => {
     try {
         const { shopId, categoryId } = req.query;
@@ -57,31 +68,50 @@ export const getProductById = async (req: Request, res: Response) => {
 /**
  * ✅ Create a new product
  */
+
 export const createProduct = async (req: Request, res: Response) => {
     try {
-        const { name, description, price, quantity, sku, shopId, categoryId } = req.body;
+        // 1️⃣ Extract token from cookie
+        const ownerId = getOwnerId(req);
+        if (!ownerId)
+            return res.status(401).json({ message: "Unauthorized — No token found" });
 
-        if (!name || !price || !quantity || !shopId)
+
+        // 3️⃣ Find seller’s shop
+        const shop = await prisma.shop.findFirst({ where: { ownerId } });
+        if (!shop)
+            return res.status(403).json({ message: "You must register a shop before adding products" });
+
+        // 4️⃣ Extract product data from request body
+        const { name, description, price, quantity, sku, categoryId, isActive } = req.body;
+
+        if (!name || price === undefined || quantity === undefined)
             return res.status(400).json({ message: "Missing required fields" });
 
+        // 5️⃣ Create product linked to the seller’s shop
         const newProduct = await prisma.product.create({
             data: {
-                name,
-                description,
+                name: name.toString(),
+                description: description ? description.toString() : null,
                 price: parseFloat(price),
                 quantity: parseInt(quantity),
-                sku,
-                shopId: parseInt(shopId),
+                sku: sku ? sku.toString() : null,
                 categoryId: categoryId ? parseInt(categoryId) : null,
+                shopId: shop.id,
+                isActive: isActive !== undefined ? Boolean(isActive) : true,
             },
         });
 
-        return res.status(201).json(newProduct);
+        return res.status(201).json({
+            message: "Product created successfully",
+            product: newProduct,
+        });
     } catch (error) {
         console.error("❌ POST product error:", error);
         return res.status(500).json({ message: "Failed to create product" });
     }
 };
+
 
 /**
  * ✅ Update a product

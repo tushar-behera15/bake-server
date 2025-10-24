@@ -76,7 +76,9 @@ export const getMyShop = async (req: Request, res: Response) => {
 
         const shop = await prisma.shop.findFirst({
             where: { ownerId },
-            include: { products: true },
+            include: {
+                products: { include: { category: true } }
+            },
         });
 
         if (!shop) return res.status(404).json({ message: "Shop not found" });
