@@ -76,19 +76,18 @@ export const createProduct = async (req: Request, res: Response) => {
         if (!ownerId)
             return res.status(401).json({ message: "Unauthorized — No token found" });
 
-
-        // 3️⃣ Find seller’s shop
+        // 2️⃣ Find seller’s shop
         const shop = await prisma.shop.findFirst({ where: { ownerId } });
         if (!shop)
             return res.status(403).json({ message: "You must register a shop before adding products" });
 
-        // 4️⃣ Extract product data from request body
-        const { name, description, price, quantity, sku, categoryId, isActive } = req.body;
+        // 3️⃣ Extract product data from request body
+        const { name, description, price, quantity, sku, categoryId, isActive, imageUrl } = req.body;
 
         if (!name || price === undefined || quantity === undefined)
             return res.status(400).json({ message: "Missing required fields" });
 
-        // 5️⃣ Create product linked to the seller’s shop
+        // 4️⃣ Create product linked to the seller’s shop
         const newProduct = await prisma.product.create({
             data: {
                 name: name.toString(),
@@ -102,15 +101,27 @@ export const createProduct = async (req: Request, res: Response) => {
             },
         });
 
+        // 5️⃣ Add a product image entry (optional, but recommended)
+        if (imageUrl) {
+            await prisma.productImage.create({
+                data: {
+                    url: imageUrl.toString(),
+                    isThumbnail: true, // default thumbnail
+                    productId: newProduct.id,
+                },
+            });
+        }
+
         return res.status(201).json({
             message: "Product created successfully",
-            product: newProduct,
+            newProduct,
         });
     } catch (error) {
         console.error("❌ POST product error:", error);
         return res.status(500).json({ message: "Failed to create product" });
     }
 };
+
 
 
 /**
@@ -146,9 +157,12 @@ export const updateProduct = async (req: Request, res: Response) => {
  */
 export const deleteProduct = async (req: Request, res: Response) => {
     try {
-        const id = parseInt(req.params.id);
+        const { id } = req.params;
 
-        await prisma.product.delete({ where: { id } });
+        await prisma.productImage.deleteMany({
+            where: { productId: parseInt(id) },
+        });
+        await prisma.product.delete({ where: { id: parseInt(id) } });
 
         res.json({ message: "Product deleted successfully" });
     } catch (error) {
