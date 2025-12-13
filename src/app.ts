@@ -9,6 +9,7 @@ import productrouter from "./routes/product.route";
 import categoryrouter from "./routes/category.route";
 import shoprouter from "./routes/shop.route";
 import uploadRouter from "./routes/uploadpic.route";
+import cartrouter from "./routes/cart.route";
 const app = express();
 
 // Middleware
@@ -28,6 +29,7 @@ app.use("/api/product", productrouter);
 app.use("/api/category", categoryrouter);
 app.use("/api/shop", shoprouter);
 app.use("/api/upload", uploadRouter);
+app.use("/api/cart", cartrouter);
 setupSwagger(app)
 
 export default app;
