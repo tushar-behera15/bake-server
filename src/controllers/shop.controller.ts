@@ -59,14 +59,24 @@ export const createShop = async (req: Request, res: Response) => {
 export const getShops = async (_req: Request, res: Response) => {
     try {
         const shops = await prisma.shop.findMany({
-            include: { products: true },
+            include: {
+                owner: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+                products: true,
+            },
         });
+
         return res.json({ shops });
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: "Failed to fetch shops" });
     }
 };
+
 
 // Get the logged-in owner's shop
 export const getMyShop = async (req: Request, res: Response) => {
@@ -77,9 +87,18 @@ export const getMyShop = async (req: Request, res: Response) => {
         const shop = await prisma.shop.findFirst({
             where: { ownerId },
             include: {
-                products: { include: { category: true, images: true } }
+                owner: {
+                    select: {
+                        name: true,
+                        email: true,
+                        phone: true,
+                        avatarUrl: true,
+                    },
+                },
+                products: true,
             },
         });
+
 
 
         if (!shop) return res.status(404).json({ message: "Shop not found" });

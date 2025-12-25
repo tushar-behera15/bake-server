@@ -32,12 +32,17 @@ export const getCart = async (req: Request, res: Response) => {
                 product: {
                     include: {
                         images: {
-                            orderBy: { isThumbnail: "desc" }, // thumbnail first
+                            orderBy: { isThumbnail: "desc" },
                         },
                     },
                 },
             },
         });
+
+        const totalCount = cartItems.reduce(
+            (sum, item) => sum + item.quantity,
+            0
+        );
 
         const formatted = cartItems.map((item) => ({
             id: item.id,
@@ -53,12 +58,16 @@ export const getCart = async (req: Request, res: Response) => {
             },
         }));
 
-        return res.json(formatted);
+        return res.json({
+            items: formatted,
+            totalCount,
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ message: "Failed to load cart" });
     }
 };
+
 
 // =======================
 // ADD product to cart
