@@ -95,7 +95,12 @@ export const getMyShop = async (req: Request, res: Response) => {
                         avatarUrl: true,
                     },
                 },
-                products: true,
+                products: {
+                    include: {
+                        images: true,
+                        category: true,
+                    },
+                },
             },
         });
 
