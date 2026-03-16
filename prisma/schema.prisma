@@ -37,6 +37,10 @@ model User {
   cartItems Cart[]
   favorites Favorite[]
   reviews   Rating[]
+
+  // Password Reset
+  resetToken       String?
+  resetTokenExpiry DateTime?
 }
 
 enum UserRole {
@@ -235,6 +239,7 @@ enum PaymentMethod {
 
 enum PaymentStatus {
   PENDING
+  SUCCESS
   COMPLETED
   FAILED
   REFUNDED

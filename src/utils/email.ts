@@ -1,29 +1,30 @@
-// import nodemailer from "nodemailer"
-// import path from "path";
+import nodemailer from "nodemailer";
+import { ENV } from "../config/env";
 
-// // Create a test account or replace with real credentials.
-// export const transporter = nodemailer.createTransport({
-//     host: config.email.host,
-//     port: config.email.port,
-//     secure: false,
-//     auth: {
-//         user: config.email.user,
-//         pass: config.email.password,
-//     },
-// });
+const transporter = nodemailer.createTransport({
+  host: ENV.EMAIL_HOST,
+  port: ENV.EMAIL_PORT,
+  secure: ENV.EMAIL_PORT === 465, // true for 465, false for other ports
+  auth: {
+    user: ENV.EMAIL_USER,
+    pass: ENV.EMAIL_PASS,
+  },
+});
 
+export const sendEmail = async (to: string, subject: string, html: string) => {
+  const mailOptions = {
+    from: `"Bake Server" <${ENV.EMAIL_USER}>`,
+    to,
+    subject,
+    html,
+  };
 
-
-// export const registerEmail = async ({ to, url }: {
-//     to: string,
-//     url: string
-// }) => {
-//     const info = await transporter.sendMail({
-//         from: `"${config.email.senderName}" <${config.email.address}>`,
-//         to: to,
-//         subject: "Email Verification",
-//         text: `Verify Your email. click the link to verify:${url}`,
-//         html: html,
-//     });
-//     return info
-// };
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log("Email sent: " + info.messageId);
+    return info;
+  } catch (error) {
+    console.error("Error sending email:", error);
+    throw new Error("Email could not be sent");
+  }
+};
