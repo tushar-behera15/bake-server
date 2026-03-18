@@ -66,6 +66,37 @@ export const getProductById = async (req: Request, res: Response) => {
 };
 
 /**
+ * ✅ Get products for logged-in seller's shop
+ */
+export const getMyProducts = async (req: Request, res: Response) => {
+    try {
+        const ownerId = getOwnerId(req);
+        if (!ownerId) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+
+        const shop = await prisma.shop.findFirst({ where: { ownerId } });
+        if (!shop) {
+            return res.status(404).json({ message: "Shop not found for this user" });
+        }
+
+        const products = await prisma.product.findMany({
+            where: { shopId: shop.id },
+            include: {
+                category: true,
+                images: true,
+            },
+            orderBy: { createdAt: "desc" },
+        });
+
+        return res.json(products);
+    } catch (error) {
+        console.error("❌ GET my products error:", error);
+        return res.status(500).json({ message: "Failed to fetch your products" });
+    }
+};
+
+/**
  * ✅ Create a new product
  */
 

@@ -2,7 +2,7 @@ import { Response, NextFunction } from "express";
 import { AuthRequest } from "./auth";
 
 export const requireRole =
-    (role: "SELLER" | "BUYER") =>
+    (role: "SELLER" | "BUYER" | "ADMIN") =>
         (req: AuthRequest, res: Response, next: NextFunction) => {
             if (req.user?.role !== role) {
                 return res.status(403).json({ message: "Forbidden" });

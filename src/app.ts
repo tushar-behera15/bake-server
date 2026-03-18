@@ -13,6 +13,8 @@ import cartrouter from "./routes/cart.route";
 import orderRouter from "./routes/order.route";
 import orderItemRouter from "./routes/orderItem.route";
 import paymentRouter from "./routes/payment.route";
+import addressRouter from "./routes/address.route";
+import userRoute from "./routes/user.route";
 const app = express();
 
 // Middleware
@@ -36,6 +38,8 @@ app.use("/api/cart", cartrouter);
 app.use("/api/orders", orderRouter);
 app.use("/api/order-items", orderItemRouter);
 app.use("/api/payments", paymentRouter);
+app.use("/api/addresses", addressRouter);
+app.use("/api/users", userRoute);
 setupSwagger(app)
 
 export default app;

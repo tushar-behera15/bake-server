@@ -32,7 +32,7 @@ export const login = async (req: Request, res: Response) => {
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) return res.status(400).json({ message: "Invalid credentials" });
 
-  const token = signToken({ userId: user.id });
+  const token = signToken({ userId: user.id, role: user.role });
 
   // Exclude password from user object
   const { password: _, ...userData } = user;

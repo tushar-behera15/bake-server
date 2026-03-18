@@ -1,5 +1,17 @@
 import { Request, Response } from "express";
 import { prisma } from "../utils/database";
+import { verifyToken } from "../utils/jwt";
+
+const getOwnerId = (req: Request): number | null => {
+    try {
+        const token = req.cookies?.token;
+        if (!token) return null;
+        const payload: any = verifyToken(token);
+        return payload.userId;
+    } catch (err) {
+        return null;
+    }
+};
 
 export const createOrder = async (req: Request, res: Response) => {
   const { buyerId, addressId, items } = req.body;
@@ -133,6 +145,76 @@ export const getOrdersByShop = async (req: Request, res: Response) => {
     return res.json(orders);
   } catch (error) {
     console.error("Error fetching shop orders:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+export const getAllOrders = async (req: Request, res: Response) => {
+  try {
+    const orders = await prisma.order.findMany({
+      include: {
+        items: true,
+        payment: true,
+        buyer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    return res.json(orders);
+  } catch (error) {
+    console.error("Error fetching all orders:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+export const getMyShopOrders = async (req: Request, res: Response) => {
+  try {
+    const ownerId = getOwnerId(req);
+    if (!ownerId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const shop = await prisma.shop.findFirst({ where: { ownerId } });
+    if (!shop) {
+      return res.status(404).json({ message: "Shop not found" });
+    }
+
+    const orders = await prisma.order.findMany({
+      where: {
+        items: {
+          some: {
+            product: {
+              shopId: shop.id,
+            },
+          },
+        },
+      },
+      include: {
+        items: {
+          include: {
+            product: true,
+          },
+        },
+        payment: true,
+        buyer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.json(orders);
+  } catch (error) {
+    console.error("Error fetching my shop orders:", error);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
