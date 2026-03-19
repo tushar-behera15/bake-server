@@ -26,7 +26,7 @@ export const getProducts = async (req: Request, res: Response) => {
             },
             include: {
                 category: true,
-                shop: { select: { name: true } },
+                shop: { select: { id: true, name: true } },
                 images: true,
             },
             orderBy: { createdAt: "desc" },
@@ -50,7 +50,7 @@ export const getProductById = async (req: Request, res: Response) => {
             where: { id },
             include: {
                 category: true,
-                shop: { select: { name: true } },
+                shop: { select: { id: true, name: true } },
                 images: true,
             },
         });

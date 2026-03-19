@@ -66,7 +66,12 @@ export const getShops = async (_req: Request, res: Response) => {
                         name: true,
                     },
                 },
-                products: true,
+                products: {
+                    include: {
+                        images: true,
+                        category: true,
+                    },
+                },
             },
         });
 
@@ -112,6 +117,37 @@ export const getMyShop = async (req: Request, res: Response) => {
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: "Failed to fetch your shop" });
+    }
+};
+
+// Get a single shop by ID
+export const getShopById = async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id);
+        const shop = await prisma.shop.findUnique({
+            where: { id },
+            include: {
+                owner: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+                products: {
+                    include: {
+                        images: true,
+                        category: true,
+                    },
+                },
+            },
+        });
+
+        if (!shop) return res.status(404).json({ message: "Shop not found" });
+
+        return res.json({ shop });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Failed to fetch shop" });
     }
 };
 
