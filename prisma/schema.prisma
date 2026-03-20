@@ -62,7 +62,8 @@ model Shop {
   owner         User     @relation(fields: [ownerId], references: [id])
   ownerId       Int
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  latitude      Float?
+  longitude     Float?
   isActive      Boolean  @default(true)
 
   // Relationships
@@ -234,7 +235,6 @@ enum PaymentMethod {
   DEBIT_CARD
   UPI
   WALLET
-  PAYPAL
 }
 
 enum PaymentStatus {

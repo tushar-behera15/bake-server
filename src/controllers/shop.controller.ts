@@ -20,7 +20,7 @@ export const createShop = async (req: Request, res: Response) => {
         const ownerId = getOwnerId(req);
         if (!ownerId) return res.status(401).json({ message: "Unauthorized" });
 
-        const { name, address, description, contactEmail, contactNumber } = req.body;
+        const { name, address, description, contactEmail, contactNumber, latitude, longitude } = req.body;
         if (!name || !address || !contactEmail) {
             return res.status(400).json({ message: "Name, address, and email are required" });
         }
@@ -35,7 +35,16 @@ export const createShop = async (req: Request, res: Response) => {
 
         // Create shop
         const shop = await prisma.shop.create({
-            data: { name, address, description, contactEmail, contactNumber, ownerId },
+            data: { 
+                name, 
+                address, 
+                description, 
+                contactEmail, 
+                contactNumber, 
+                ownerId,
+                latitude: latitude ? parseFloat(latitude) : null,
+                longitude: longitude ? parseFloat(longitude) : null
+            },
         });
 
         // Update user's role to 'SELLER' (enum)
@@ -56,8 +65,10 @@ export const createShop = async (req: Request, res: Response) => {
 
 
 // Get all shops
-export const getShops = async (_req: Request, res: Response) => {
+export const getShops = async (req: Request, res: Response) => {
     try {
+        const { lat, lng, radius } = req.query as { lat?: string; lng?: string; radius?: string };
+
         const shops = await prisma.shop.findMany({
             include: {
                 owner: {
@@ -75,12 +86,56 @@ export const getShops = async (_req: Request, res: Response) => {
             },
         });
 
-        return res.json({ shops });
+        // Add distance and sort if lat/lng are provided
+        let resultShops = shops.map((shop: any) => {
+            let distance = null;
+            if (lat && lng && shop.latitude && shop.longitude) {
+                distance = calculateDistance(
+                    parseFloat(lat),
+                    parseFloat(lng),
+                    shop.latitude,
+                    shop.longitude
+                );
+            }
+            return { ...shop, distance };
+        });
+
+        // Filter by radius if provided
+        if (radius) {
+            const rad = parseFloat(radius);
+            resultShops = resultShops.filter((s: any) => s.distance !== null && s.distance <= rad);
+        }
+
+        // Sort by distance if provided
+        if (lat && lng) {
+            resultShops.sort((a: any, b: any) => {
+                if (a.distance === null) return 1;
+                if (b.distance === null) return -1;
+                return a.distance - b.distance;
+            });
+        }
+
+        return res.json({ shops: resultShops });
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: "Failed to fetch shops" });
     }
 };
+
+// Helper: Haversine distance
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371; // km
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos((lat1 * Math.PI) / 180) *
+            Math.cos((lat2 * Math.PI) / 180) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
 
 
 // Get the logged-in owner's shop
@@ -157,11 +212,19 @@ export const updateShop = async (req: Request, res: Response) => {
         const ownerId = getOwnerId(req);
         if (!ownerId) return res.status(401).json({ message: "Unauthorized" });
 
-        const { name, address, description, contactEmail, contactNumber } = req.body;
+        const { name, address, description, contactEmail, contactNumber, latitude, longitude } = req.body;
 
         const updatedShop = await prisma.shop.updateMany({
             where: { ownerId },
-            data: { name, address, description, contactEmail, contactNumber },
+            data: { 
+                name, 
+                address, 
+                description, 
+                contactEmail, 
+                contactNumber,
+                latitude: latitude ? parseFloat(latitude) : undefined,
+                longitude: longitude ? parseFloat(longitude) : undefined
+            },
         });
 
         return res.json({ message: "Shop updated", updatedShop });
