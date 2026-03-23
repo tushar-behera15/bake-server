@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "../utils/database";
 import { verifyToken } from "../utils/jwt";
+import { razorpay } from "../utils/razorpay";
 
 const getOwnerId = (req: Request): number | null => {
     try {
@@ -42,9 +43,36 @@ export const createOrder = async (req: Request, res: Response) => {
       });
 
       return newOrder;
+    }, {
+      maxWait: 5000,
+      timeout: 10000,
     });
 
-    return res.status(201).json(order);
+    // 4. Create Razorpay order
+    const options = {
+      amount: Math.round(order.totalAmount * 100), // in paise
+      currency: "INR",
+      receipt: `receipt_order_${order.id}`,
+    };
+
+    const razorpayOrder = await razorpay.orders.create(options);
+
+    // 5. Create payment record
+    await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        amount: order.totalAmount,
+        method: "UPI", // Default method
+        status: "PENDING",
+        razorpayOrderId: razorpayOrder.id,
+      },
+    });
+
+    return res.status(201).json({
+      ...order,
+      razorpay_order_id: razorpayOrder.id,
+      key_id: process.env.RAZORPAY_KEY_ID,
+    });
   } catch (error) {
     console.error("Error creating order:", error);
     return res.status(500).json({ message: "Internal Server Error" });

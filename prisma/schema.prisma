@@ -228,6 +228,11 @@ model Payment {
   amount    Float
   paidAt    DateTime?
   createdAt DateTime      @default(now())
+
+  // Razorpay fields
+  razorpayOrderId   String?       @unique
+  razorpayPaymentId String?
+  razorpaySignature String?
 }
 
 enum PaymentMethod {

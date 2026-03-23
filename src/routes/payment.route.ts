@@ -6,6 +6,7 @@ import { validateRequest } from "../middleware/validate.middleware";
 const paymentRouter = Router();
 
 paymentRouter.post("/", validateRequest(createPaymentSchema), paymentController.createPayment);
+paymentRouter.post("/verify", paymentController.verifyPayment);
 paymentRouter.get("/:orderId", paymentController.getPaymentByOrder);
 paymentRouter.patch("/:id/status", validateRequest(updatePaymentStatusSchema), paymentController.updatePaymentStatus);
 

@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "../utils/database";
+import { razorpay } from "../utils/razorpay";
+import crypto from "crypto";
 
 export const createPayment = async (req: Request, res: Response) => {
   const { orderId, amount, method } = req.body;
@@ -19,19 +21,83 @@ export const createPayment = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Payment amount does not match order total" });
     }
 
-    // 3. Create payment record
-    const payment = await prisma.payment.create({
-      data: {
+    // 3. Create Razorpay order
+    const options = {
+      amount: Math.round(amount * 100), // Razorpay expects amount in paise (e.g., ₹1.00 = 100 paise)
+      currency: "INR",
+      receipt: `receipt_order_${orderId}`,
+    };
+
+    const razorpayOrder = await razorpay.orders.create(options);
+
+    // 4. Create/Update payment record in database
+    const payment = await prisma.payment.upsert({
+      where: { orderId: orderId },
+      update: {
+        amount,
+        method,
+        status: "PENDING",
+        razorpayOrderId: razorpayOrder.id,
+      },
+      create: {
         orderId,
         amount,
         method,
         status: "PENDING",
+        razorpayOrderId: razorpayOrder.id,
       },
     });
 
-    return res.status(201).json(payment);
+    return res.status(201).json({
+      ...payment,
+      razorpay_order_id: razorpayOrder.id,
+      key_id: process.env.RAZORPAY_KEY_ID,
+    });
   } catch (error) {
     console.error("Error creating payment:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+export const verifyPayment = async (req: Request, res: Response) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+  try {
+    // 1. Validate signature
+    const hmac = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET || "");
+    hmac.update(`${razorpay_order_id}|${razorpay_payment_id}`);
+    const generatedSignature = hmac.digest("hex");
+
+    if (generatedSignature !== razorpay_signature) {
+      return res.status(400).json({ message: "Invalid signature" });
+    }
+
+    // 2. Update payment and order status
+    const updatedPayment = await prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.update({
+        where: { razorpayOrderId: razorpay_order_id },
+        data: {
+          status: "SUCCESS",
+          paidAt: new Date(),
+          razorpayPaymentId: razorpay_payment_id,
+          razorpaySignature: razorpay_signature,
+        },
+      });
+
+      await tx.order.update({
+        where: { id: payment.orderId },
+        data: { status: "PAID" },
+      });
+
+      return payment;
+    }, {
+      maxWait: 5000,
+      timeout: 10000,
+    });
+
+    return res.json({ message: "Payment verified successfully", payment: updatedPayment });
+  } catch (error) {
+    console.error("Error verifying payment:", error);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
@@ -78,6 +144,9 @@ export const updatePaymentStatus = async (req: Request, res: Response) => {
       }
 
       return payment;
+    }, {
+      maxWait: 5000,
+      timeout: 10000,
     });
 
     return res.json(updatedPayment);
