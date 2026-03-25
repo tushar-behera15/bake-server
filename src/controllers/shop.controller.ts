@@ -89,13 +89,19 @@ export const getShops = async (req: Request, res: Response) => {
         // Add distance and sort if lat/lng are provided
         let resultShops = shops.map((shop: any) => {
             let distance = null;
-            if (lat && lng && shop.latitude && shop.longitude) {
-                distance = calculateDistance(
-                    parseFloat(lat),
-                    parseFloat(lng),
-                    shop.latitude,
-                    shop.longitude
-                );
+            if (lat && lng && shop.latitude !== null && shop.longitude !== null) {
+                const userLat = parseFloat(lat);
+                const userLng = parseFloat(lng);
+
+                // Ensure we have valid numbers before calculating
+                if (!isNaN(userLat) && !isNaN(userLng)) {
+                    distance = calculateDistance(
+                        userLat,
+                        userLng,
+                        shop.latitude,
+                        shop.longitude
+                    );
+                }
             }
             return { ...shop, distance };
         });
@@ -103,11 +109,13 @@ export const getShops = async (req: Request, res: Response) => {
         // Filter by radius if provided
         if (radius) {
             const rad = parseFloat(radius);
-            resultShops = resultShops.filter((s: any) => s.distance !== null && s.distance <= rad);
+            if (!isNaN(rad)) {
+                resultShops = resultShops.filter((s: any) => s.distance !== null && s.distance <= rad);
+            }
         }
 
         // Sort by distance if provided
-        if (lat && lng) {
+        if (lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng))) {
             resultShops.sort((a: any, b: any) => {
                 if (a.distance === null) return 1;
                 if (b.distance === null) return -1;
@@ -133,7 +141,10 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
             Math.cos((lat2 * Math.PI) / 180) *
             Math.sin(dLon / 2) *
             Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    
+    // Clamp 'a' to [0, 1] to avoid NaN from sqrt due to floating point precision jitter
+    const clampedA = Math.max(0, Math.min(1, a));
+    const c = 2 * Math.atan2(Math.sqrt(clampedA), Math.sqrt(1 - clampedA));
     return R * c;
 }
 

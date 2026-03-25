@@ -155,3 +155,40 @@ export const updatePaymentStatus = async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+export const getPaymentsByUser = async (req: Request, res: Response) => {
+  const { buyerId } = req.query;
+
+  if (!buyerId) {
+    return res.status(400).json({ message: "buyerId is required" });
+  }
+
+  try {
+    const payments = await prisma.payment.findMany({
+      where: {
+        order: {
+          buyerId: parseInt(buyerId as string),
+        },
+      },
+      include: {
+        order: {
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        },
+      },
+
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    return res.json(payments);
+  } catch (error) {
+    console.error("Error fetching user payments:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
