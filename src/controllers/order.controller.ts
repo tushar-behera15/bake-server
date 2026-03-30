@@ -14,25 +14,65 @@ const getOwnerId = (req: Request): number | null => {
     }
 };
 
+import { checkLowStockAndNotify } from "../services/alert.service";
+
 export const createOrder = async (req: Request, res: Response) => {
-  const { buyerId, addressId, items } = req.body;
+  const { buyerId, addressId, items, idempotencyKey } = req.body;
 
   try {
-    const order = await prisma.$transaction(async (tx) => {
-      // 1. Calculate totalAmount
+    // 1. Idempotency Check
+    if (idempotencyKey) {
+      const existingOrder = await prisma.order.findUnique({
+        where: { idempotencyKey },
+        include: { items: true, payment: true },
+      });
+
+      if (existingOrder) {
+        return res.status(200).json({
+          success: true,
+          message: "Order already exists (Idempotent)",
+          orderId: existingOrder.id,
+          ...existingOrder,
+        });
+      }
+    }
+
+    const { order, stockUpdates } = await prisma.$transaction(async (tx) => {
+      // 2. Validate stock and deduct immediately (Atomic)
+      const updates = [];
+      for (const item of items) {
+        try {
+          const updatedProduct = await tx.product.update({
+            where: { 
+              id: item.productId, 
+              stock_quantity: { gte: item.quantity } 
+            },
+            data: { 
+              stock_quantity: { decrement: item.quantity } 
+            },
+          });
+          updates.push(updatedProduct);
+        } catch (error: any) {
+          // P2025: Record to update not found or condition not met
+          throw new Error(`Out of Stock: Product ID ${item.productId}`);
+        }
+      }
+
+      // 3. Calculate totalAmount
       const totalAmount = items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
 
-      // 2. Create order
+      // 4. Create order
       const newOrder = await tx.order.create({
         data: {
           buyerId,
           addressId,
           totalAmount,
           status: "PENDING",
+          idempotencyKey,
         },
       });
 
-      // 3. Insert order items
+      // 5. Insert order items
       await tx.orderItem.createMany({
         data: items.map((item: any) => ({
           orderId: newOrder.id,
@@ -42,13 +82,13 @@ export const createOrder = async (req: Request, res: Response) => {
         })),
       });
 
-      return newOrder;
+      return { order: newOrder, stockUpdates: updates };
     }, {
       maxWait: 5000,
       timeout: 10000,
     });
 
-    // 4. Create Razorpay order
+    // 6. Create Razorpay order
     const options = {
       amount: Math.round(order.totalAmount * 100), // in paise
       currency: "INR",
@@ -57,7 +97,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
     const razorpayOrder = await razorpay.orders.create(options);
 
-    // 5. Create payment record
+    // 7. Create payment record
     await prisma.payment.create({
       data: {
         orderId: order.id,
@@ -68,14 +108,25 @@ export const createOrder = async (req: Request, res: Response) => {
       },
     });
 
+    // 8. Trigger Low Stock Alerts (Async)
+    items.forEach((item: any) => {
+      checkLowStockAndNotify(item.productId).catch(err => console.error("Alert trigger error:", err));
+    });
+
     return res.status(201).json({
-      ...order,
+      success: true,
+      message: "Order placed successfully",
+      orderId: order.id,
+      remainingStock: stockUpdates.map(p => ({ productId: p.id, stock: p.stock_quantity })),
       razorpay_order_id: razorpayOrder.id,
       key_id: process.env.RAZORPAY_KEY_ID,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message.startsWith("Out of Stock")) {
+      return res.status(400).json({ success: false, message: "Out of Stock" });
+    }
     console.error("Error creating order:", error);
-    return res.status(500).json({ message: "Internal Server Error" });
+    return res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
 

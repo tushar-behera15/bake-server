@@ -113,9 +113,9 @@ export const createProduct = async (req: Request, res: Response) => {
             return res.status(403).json({ message: "You must register a shop before adding products" });
 
         // 3️⃣ Extract product data from request body
-        const { name, description, price, quantity, sku, categoryId, isActive, imageUrl } = req.body;
+        const { name, description, price, stock_quantity, low_stock_threshold, sku, categoryId, isActive, imageUrl } = req.body;
 
-        if (!name || price === undefined || quantity === undefined)
+        if (!name || price === undefined || stock_quantity === undefined)
             return res.status(400).json({ message: "Missing required fields" });
 
         // 4️⃣ Create product linked to the seller’s shop
@@ -124,7 +124,8 @@ export const createProduct = async (req: Request, res: Response) => {
                 name: name.toString(),
                 description: description ? description.toString() : null,
                 price: parseFloat(price),
-                quantity: parseInt(quantity),
+                stock_quantity: parseInt(stock_quantity),
+                low_stock_threshold: low_stock_threshold ? parseInt(low_stock_threshold) : 10,
                 sku: sku ? sku.toString() : null,
                 categoryId: categoryId ? parseInt(categoryId) : null,
                 shopId: shop.id,
@@ -161,7 +162,7 @@ export const createProduct = async (req: Request, res: Response) => {
 export const updateProduct = async (req: Request, res: Response) => {
     try {
         const id = parseInt(req.params.id);
-        const { name, description, price, quantity, categoryId, isActive } =
+        const { name, description, price, stock_quantity, low_stock_threshold, categoryId, isActive } =
             req.body;
 
         const updatedProduct = await prisma.product.update({
@@ -170,7 +171,8 @@ export const updateProduct = async (req: Request, res: Response) => {
                 ...(name && { name }),
                 ...(description && { description }),
                 ...(price && { price: parseFloat(price) }),
-                ...(quantity && { quantity: parseInt(quantity) }),
+                ...(stock_quantity !== undefined && { stock_quantity: parseInt(stock_quantity) }),
+                ...(low_stock_threshold !== undefined && { low_stock_threshold: parseInt(low_stock_threshold) }),
                 ...(categoryId && { categoryId: parseInt(categoryId) }),
                 ...(isActive !== undefined && { isActive }),
             },

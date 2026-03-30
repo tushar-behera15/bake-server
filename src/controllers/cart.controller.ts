@@ -34,6 +34,9 @@ export const getCart = async (req: Request, res: Response) => {
                         images: {
                             orderBy: { isThumbnail: "desc" },
                         },
+                        shop: {
+                            select: { name: true }
+                        }
                     },
                 },
             },
@@ -51,6 +54,8 @@ export const getCart = async (req: Request, res: Response) => {
                 id: item.product.id,
                 name: item.product.name,
                 price: item.product.price,
+                stock_quantity: item.product.stock_quantity,
+                shopName: item.product.shop?.name || "Bakery Shop",
                 imageUrl:
                     item.product.images.find((img) => img.isThumbnail)?.url ||
                     item.product.images[0]?.url ||

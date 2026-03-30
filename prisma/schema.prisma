@@ -103,7 +103,8 @@ model Product {
   name        String
   description String?
   price       Float
-  quantity    Int
+  stock_quantity      Int      @default(0)
+  low_stock_threshold Int @default(10)
   sku         String?   @unique
   shop        Shop      @relation(fields: [shopId], references: [id])
   shopId      Int
@@ -185,6 +186,7 @@ model Order {
   buyerId         Int
   totalAmount     Float
   status          OrderStatus @default(PENDING) // PENDING, PAID, SHIPPED, DELIVERED, CANCELLED
+  idempotencyKey  String?     @unique
   payment         Payment?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt

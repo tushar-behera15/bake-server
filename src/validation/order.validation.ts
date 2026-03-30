@@ -8,6 +8,7 @@ export const createOrderSchema = z.object({
     price: z.number().positive(),
     quantity: z.number().int().positive(),
   })).nonempty("items array must not be empty"),
+  idempotencyKey: z.string().uuid().optional(),
 });
 
 export const updateOrderStatusSchema = z.object({
