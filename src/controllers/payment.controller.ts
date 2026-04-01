@@ -155,6 +155,19 @@ export const updatePaymentStatus = async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+import { verifyToken } from "../utils/jwt";
+
+const getOwnerId = (req: Request): number | null => {
+  try {
+    const token = req.cookies?.token;
+    if (!token) return null;
+    const payload: any = verifyToken(token);
+    return payload.userId;
+  } catch (err) {
+    return null;
+  }
+};
+
 export const getPaymentsByUser = async (req: Request, res: Response) => {
   const { buyerId } = req.query;
 
@@ -189,6 +202,58 @@ export const getPaymentsByUser = async (req: Request, res: Response) => {
     return res.json(payments);
   } catch (error) {
     console.error("Error fetching user payments:", error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+export const getMyShopPayments = async (req: Request, res: Response) => {
+  try {
+    const ownerId = getOwnerId(req);
+    if (!ownerId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const shop = await prisma.shop.findFirst({ where: { ownerId } });
+    if (!shop) {
+      return res.status(404).json({ message: "Shop not found" });
+    }
+
+    const payments = await prisma.payment.findMany({
+      where: {
+        order: {
+          items: {
+            some: {
+              product: {
+                shopId: shop.id,
+              },
+            },
+          },
+        },
+      },
+      include: {
+        order: {
+          include: {
+            buyer: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            items: {
+              include: {
+                product: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.json(payments);
+  } catch (error) {
+    console.error("Error fetching shop payments:", error);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };

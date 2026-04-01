@@ -241,6 +241,7 @@ enum PaymentMethod {
   DEBIT_CARD
   UPI
   WALLET
+  CASH
 }
 
 enum PaymentStatus {

@@ -4,20 +4,20 @@ import { verifyToken } from "../utils/jwt";
 import { razorpay } from "../utils/razorpay";
 
 const getOwnerId = (req: Request): number | null => {
-    try {
-        const token = req.cookies?.token;
-        if (!token) return null;
-        const payload: any = verifyToken(token);
-        return payload.userId;
-    } catch (err) {
-        return null;
-    }
+  try {
+    const token = req.cookies?.token;
+    if (!token) return null;
+    const payload: any = verifyToken(token);
+    return payload.userId;
+  } catch (err) {
+    return null;
+  }
 };
 
 import { checkLowStockAndNotify } from "../services/alert.service";
 
 export const createOrder = async (req: Request, res: Response) => {
-  const { buyerId, addressId, items, idempotencyKey } = req.body;
+  const { buyerId, addressId, items, idempotencyKey, paymentMethod } = req.body;
 
   try {
     // 1. Idempotency Check
@@ -43,12 +43,12 @@ export const createOrder = async (req: Request, res: Response) => {
       for (const item of items) {
         try {
           const updatedProduct = await tx.product.update({
-            where: { 
-              id: item.productId, 
-              stock_quantity: { gte: item.quantity } 
+            where: {
+              id: item.productId,
+              stock_quantity: { gte: item.quantity }
             },
-            data: { 
-              stock_quantity: { decrement: item.quantity } 
+            data: {
+              stock_quantity: { decrement: item.quantity }
             },
           });
           updates.push(updatedProduct);
@@ -88,23 +88,29 @@ export const createOrder = async (req: Request, res: Response) => {
       timeout: 10000,
     });
 
-    // 6. Create Razorpay order
-    const options = {
-      amount: Math.round(order.totalAmount * 100), // in paise
-      currency: "INR",
-      receipt: `receipt_order_${order.id}`,
-    };
+    let razorpayOrderId = null;
+    let keyId = process.env.RAZORPAY_KEY_ID;
 
-    const razorpayOrder = await razorpay.orders.create(options);
+    if (paymentMethod !== "CASH") {
+      // 6. Create Razorpay order
+      const options = {
+        amount: Math.round(order.totalAmount * 100), // in paise
+        currency: "INR",
+        receipt: `receipt_order_${order.id}`,
+      };
+
+      const razorpayOrder = await razorpay.orders.create(options);
+      razorpayOrderId = razorpayOrder.id;
+    }
 
     // 7. Create payment record
     await prisma.payment.create({
       data: {
         orderId: order.id,
         amount: order.totalAmount,
-        method: "UPI", // Default method
+        method: paymentMethod === "CASH" ? "CASH" : (paymentMethod || "UPI"),
         status: "PENDING",
-        razorpayOrderId: razorpayOrder.id,
+        razorpayOrderId: razorpayOrderId,
       },
     });
 
@@ -118,8 +124,8 @@ export const createOrder = async (req: Request, res: Response) => {
       message: "Order placed successfully",
       orderId: order.id,
       remainingStock: stockUpdates.map(p => ({ productId: p.id, stock: p.stock_quantity })),
-      razorpay_order_id: razorpayOrder.id,
-      key_id: process.env.RAZORPAY_KEY_ID,
+      razorpay_order_id: razorpayOrderId,
+      key_id: keyId,
     });
   } catch (error: any) {
     if (error.message.startsWith("Out of Stock")) {
@@ -178,10 +184,24 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
   const { status } = req.body;
 
   try {
+    const orderId = parseInt(id);
+
+    // 1. Update the Order
     const updatedOrder = await prisma.order.update({
-      where: { id: parseInt(id) },
+      where: { id: orderId },
       data: { status },
     });
+
+    // 2. If status is PAID, also update the Payment record if it exists
+    if (status === "PAID") {
+      await prisma.payment.updateMany({
+        where: { orderId: orderId },
+        data: {
+          status: "SUCCESS",
+          paidAt: new Date()
+        }
+      });
+    }
 
     return res.json(updatedOrder);
   } catch (error) {
