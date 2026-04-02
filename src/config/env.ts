@@ -11,5 +11,6 @@ export const ENV = {
   EMAIL_PORT: Number(process.env.EMAIL_PORT) || 587,
   EMAIL_USER: process.env.EMAIL_USER,
   EMAIL_PASS: process.env.EMAIL_PASS,
-  FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:5173"
+  FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:5173",
+  SERVER_URL: process.env.SERVER_URL || "http://localhost:4000"
 };

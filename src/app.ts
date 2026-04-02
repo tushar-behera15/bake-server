@@ -40,6 +40,11 @@ app.use("/api/order-items", orderItemRouter);
 app.use("/api/payments", paymentRouter);
 app.use("/api/addresses", addressRouter);
 app.use("/api/users", userRoute);
+// Health check route
+app.get("/ping", (req, res) => {
+  res.status(200).send("pong");
+});
+
 setupSwagger(app)
 
 export default app;
