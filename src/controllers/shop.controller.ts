@@ -259,3 +259,25 @@ export const deleteShop = async (req: Request, res: Response) => {
         return res.status(500).json({ message: "Failed to delete shop" });
     }
 };
+
+// Toggle shop status (Admin only)
+export const toggleShopStatus = async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id);
+        const { isActive } = req.body;
+
+        if (typeof isActive !== "boolean") {
+            return res.status(400).json({ message: "isActive (boolean) is required" });
+        }
+
+        const shop = await prisma.shop.update({
+            where: { id },
+            data: { isActive },
+        });
+
+        return res.json({ message: `Shop ${isActive ? "activated" : "deactivated"} successfully`, shop });
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Failed to toggle shop status" });
+    }
+};

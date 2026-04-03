@@ -37,3 +37,32 @@ export const requireAuth = async (
         return res.status(401).json({ message: "Invalid token" });
     }
 };
+
+export const optionalAuth = async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction
+) => {
+    try {
+        const token = req.cookies?.token;
+        if (!token) return next();
+
+        const payload: any = verifyToken(token);
+        if (!payload) return next();
+
+        let role = payload.role;
+        if (!role) {
+            const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+            role = user?.role;
+        }
+
+        req.user = {
+            id: payload.userId,
+            role: role,
+        };
+
+        return next();
+    } catch {
+        return next();
+    }
+};

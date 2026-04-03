@@ -1,5 +1,6 @@
 import { prisma } from "../utils/database";
 import { Request, Response } from "express";
+import { AuthRequest } from "../middleware/auth";
 
 // Helper function to format category for frontend
 const formatCategory = (cat: any) => ({
@@ -10,9 +11,31 @@ const formatCategory = (cat: any) => ({
 
 
 // GET all categories
-export const getCategories = async (req: Request, res: Response) => {
+export const getCategories = async (req: AuthRequest, res: Response) => {
     try {
-        const categories = await prisma.category.findMany({ include: { products: true } });
+        let shopId: number | undefined;
+
+        // If user is a SELLER, filter counts by their shop
+        if (req.user?.role === "SELLER") {
+            const shop = await prisma.shop.findFirst({
+                where: { ownerId: req.user.id }
+            });
+            if (shop) {
+                shopId = shop.id;
+            }
+        }
+
+        // If user is ADMIN, shopId remains undefined -> no filter (shows total count)
+        // If user is BUYER or not logged in, shopId remains undefined -> total count
+
+        const categories = await prisma.category.findMany({ 
+            include: { 
+                products: {
+                    where: shopId ? { shopId } : {}
+                } 
+            } 
+        });
+
         const result = categories.map(formatCategory);
         res.json(result);
     } catch (error) {
