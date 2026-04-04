@@ -82,10 +82,10 @@ export const me = async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { 
-        id: true, 
-        name: true, 
-        email: true, 
+      select: {
+        id: true,
+        name: true,
+        email: true,
         role: true,
         shops: {
           select: {
@@ -121,7 +121,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
       .digest("hex");
 
     // Set token expiry (1 hour)
-    const resetTokenExpiry = new Date(Date.now() + 3600000);
+    const resetTokenExpiry = new Date(Date.now() + (5 * 60 * 1000));
 
     // Update user in database
     await prisma.user.update({
@@ -133,7 +133,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     });
 
     // Send password reset email
-    const resetUrl = `${ENV.FRONTEND_URL}/reset-password/${resetToken}`;
+    const resetUrl = `${ENV.FRONTEND_URL}/auth/reset-password/${resetToken}`;
     const message = `
       <h1>Password Reset Request</h1>
       <p>You requested a password reset. Please click the link below to reset your password:</p>
@@ -147,9 +147,9 @@ export const forgotPassword = async (req: Request, res: Response) => {
     return res.status(200).json({ message: "Password reset link sent to your email" });
   } catch (error: any) {
     console.error("Forgot password error:", error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       message: error.message || "Something went wrong",
-      error: ENV.NODE_ENV === "development" ? error : undefined 
+      error: ENV.NODE_ENV === "development" ? error : undefined
     });
   }
 };
