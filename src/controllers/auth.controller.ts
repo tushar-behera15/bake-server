@@ -121,7 +121,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
       .digest("hex");
 
     // Set token expiry (1 hour)
-    const resetTokenExpiry = new Date(Date.now() + (5 * 60 * 1000));
+    const resetTokenExpiry = new Date(Date.now() + (60 * 60 * 1000));
 
     // Update user in database
     await prisma.user.update({
@@ -137,7 +137,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     const message = `
       <h1>Password Reset Request</h1>
       <p>You requested a password reset. Please click the link below to reset your password:</p>
-      <a href="${resetUrl}" clicktracking=off>${resetUrl}</a>
+      <a href="${resetUrl}">${resetUrl}</a>
       <p>This link will expire in 1 hour.</p>
       <p>If you did not request this, please ignore this email.</p>
     `;
